@@ -31,3 +31,7 @@ void dse_union(disjoint_set_e* x, disjoint_set_e* y) {
 		rootx->rank++;
 	}
 }
+
+int main() {
+	printf("hello\n");
+}

@@ -5,7 +5,7 @@ struct disjoint_set_e {
 	int rank;
 	struct disjoint_set_e *parent;
 	void* array_content;
-}
+};
 
 typedef struct disjoint_set_e disjoint_set_e;
 
