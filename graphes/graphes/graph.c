@@ -1,8 +1,9 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 #include <float.h>
 #include "disjoint_set.h"
-#include "../binheap/binheap.h"
+#include "binheap.h"
 
 typedef struct node {
 	int x;
@@ -25,7 +26,7 @@ graph* init_graph(size_t nodeslen, size_t edgeslen, node* nodes, edge* edges) {
 	graph* ret = malloc(sizeof(graph));
 	ret->nodes = nodes;
 	ret->edges = edges;
-	for(int i=0; i<edgeslen; i++) {
+	for(size_t i=0; i<edgeslen; i++) {
 		if(edges[i].node1 >= nodeslen || edges[i].node2 >= nodeslen) {
 			free(ret);
 			return NULL;
@@ -61,13 +62,13 @@ assoc_elem* to_assoc(graph* g) {
 		assoc[node1].lengths = realloc(assoc[node1].lengths, (assoc[node1].nb_neighbors + 1) * sizeof(size_t));
 		assoc[node1].neighbors[assoc[node1].nb_neighbors] = node2;
 		assoc[node1].lengths[assoc[node1].nb_neighbors] = distance_e(g, g->edges + i);
-		assoc[node1].neighbors++;
+		assoc[node1].nb_neighbors++;
 		
 		assoc[node2].neighbors = realloc(assoc[node2].neighbors, (assoc[node2].nb_neighbors + 1) * sizeof(size_t));
 		assoc[node2].lengths = realloc(assoc[node2].lengths, (assoc[node2].nb_neighbors + 1) * sizeof(size_t));
 		assoc[node2].neighbors[assoc[node2].nb_neighbors] = node1;
 		assoc[node2].lengths[assoc[node2].nb_neighbors] = distance_e(g, g->edges + i);
-		assoc[node2].neighbors++;
+		assoc[node2].nb_neighbors++;
 	}
 	return assoc;
 }
@@ -82,7 +83,7 @@ edge* kruskal(graph* g) {
 
 	int cpt = 0;
 
-	for(int i=0; i<g->nodeslen; i++) {
+	for(size_t i=0; i<g->nodeslen; i++) {
 		disjoint_set_e* ds_node_i = malloc(sizeof(disjoint_set_e));
 		ds_node_i->rank = 0;
 		ds_node_i->parent = ds_node_i;
@@ -90,14 +91,14 @@ edge* kruskal(graph* g) {
 		ds.elements[i] = ds_node_i;
 	}
 
-	for(int i=0; i<g->edgeslen; i++) {
+	for(size_t i=0; i<g->edgeslen; i++) {
 		if(dse_find(ds.elements[g->edges[i].node1])
 			!= dse_find(ds.elements[g->edges[i].node2]))
 		{
 			dse_union(ds.elements[g->edges[i].node1],
 					ds.elements[g->edges[i].node2]);
 			ret[cpt] = g->edges[i];
-			cpt;
+			//cpt; WHYYYYYYYYYYY ????
 		}
 	}
 	return ret;
@@ -125,8 +126,8 @@ double djikstra(graph* g, size_t dst, size_t start) {
 		else dists[i].dist = DBL_MAX; // BAD_C0DE
 	}
 
-	djikstra_node** array_nodes = malloc(1*sizeof(djikstra_node*));
-	array_nodes[0] = &(dists[start]);
+	djikstra_node** array_nodes = malloc(2*sizeof(djikstra_node*));
+	array_nodes[1] = &(dists[start]);
 
 	binary_heap min_dist;
 
@@ -138,7 +139,7 @@ double djikstra(graph* g, size_t dst, size_t start) {
 
 	while(min_dist.size > 0) {
 		djikstra_node* u = remove_heap(&min_dist);
-		for(int i=0; i<assoc_list[u->id].nb_neighbors; i++) {
+		for(size_t i=0; i<assoc_list[u->id].nb_neighbors; i++) {
 			djikstra_node* neighbor = dists + assoc_list[u->id].neighbors[i];
 			double edge_length = assoc_list[u->id].lengths[i];
 			if(u->dist + edge_length < neighbor->dist) {
@@ -149,4 +150,52 @@ double djikstra(graph* g, size_t dst, size_t start) {
 	}
 
 	return dists[dst].dist;
+}
+
+int main(int argc, char const* argv[])
+{
+	node nodes[6];
+	int xs[6] = {0, 1, 2, 3, 4, 3};
+	int ys[6] = {0, 3, 2, 1, 2, 3};
+	for(int i=0; i<6; i++) {
+		nodes[i].x = xs[i];
+		nodes[i].y = ys[i];
+	}
+	edge edges[9];
+	edges[0].node1 = 0;
+	edges[0].node2 = 1;
+	
+	edges[1].node1 = 1;
+	edges[1].node2 = 2;
+	
+	edges[2].node1 = 0;
+	edges[2].node2 = 2;
+	
+	edges[3].node1 = 0;
+	edges[3].node2 = 3;
+	
+	edges[4].node1 = 2;
+	edges[4].node2 = 3;
+	
+	edges[5].node1 = 2;
+	edges[5].node2 = 5;
+	
+	edges[6].node1 = 3;
+	edges[6].node2 = 5;
+	
+	edges[7].node1 = 3;
+	edges[7].node2 = 4;
+	
+	edges[8].node1 = 5;
+	edges[8].node2 = 4;
+
+	graph g;
+	g.edges = edges;
+	g.edgeslen = 9;
+	g.nodes = nodes;
+	g.nodeslen = 6;
+
+	double min_d = djikstra(&g, 4, 0);
+	printf("%lf", min_d);
+	return 0;
 }
