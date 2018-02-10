@@ -1,12 +1,15 @@
 CC=gcc
 CFLAGS=-W -Wall -ansi -pedantic -std=gnu99
 LDFLAGS=-lm
-EXEC=graph
+EXEC=generation
 
 all: $(EXEC)
 
-graph: graph.o binheap.o disjoint_set.o binheap.h disjoint_set.h
-		$(CC) -o graph graph.o binheap.o disjoint_set.o $(LDFLAGS)
+generation: generation.o graph.o binheap.o disjoint_set.o graph.h binheap.h disjoint_set.h
+		$(CC) -o generation generation.o graph.o binheap.o disjoint_set.o $(LDFLAGS)
+
+generation.o: generation.c
+		$(CC) -c generation.c $(CFLAGS)
 
 graph.o: graph.c
 		$(CC) -c graph.c $(CFLAGS)

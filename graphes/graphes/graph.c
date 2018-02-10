@@ -4,23 +4,7 @@
 #include <float.h>
 #include "disjoint_set.h"
 #include "binheap.h"
-
-typedef struct node {
-	int x;
-	int y;
-} node;
-
-typedef struct edge {
-	size_t node1;
-	size_t node2;
-} edge;
-
-typedef struct graph {
-	node* nodes;
-	size_t nodeslen;
-	edge* edges;
-	size_t edgeslen;
-} graph;
+#include "graph.h"
 
 graph* init_graph(size_t nodeslen, size_t edgeslen, node* nodes, edge* edges) {
 	graph* ret = malloc(sizeof(graph));
@@ -34,12 +18,6 @@ graph* init_graph(size_t nodeslen, size_t edgeslen, node* nodes, edge* edges) {
 	}
 	return ret;
 }
-
-typedef struct assoc_elem {
-	size_t* neighbors;
-	double* lengths;
-	size_t nb_neighbors;
-} assoc_elem;
 
 double distance_n(node* n1, node* n2) {
 	return sqrt((n1->x - n2->x)*(n1->x - n2->x) + (n1->y - n2->y)*(n1->y - n2->y));
@@ -75,13 +53,11 @@ assoc_elem* to_assoc(graph* g) {
 
 //-------------------------------------------------------------------//
 
-edge* kruskal(graph* g) {
+size_t kruskal(graph* g, edge* ret) {
 	disjoint_set ds;
 	ds.elements = malloc(sizeof(disjoint_set_e)*g->nodeslen);
 
-	edge* ret = malloc(sizeof(edge)*g->edgeslen);
-
-	int cpt = 0;
+	size_t cpt = 0;
 
 	for(size_t i=0; i<g->nodeslen; i++) {
 		disjoint_set_e* ds_node_i = malloc(sizeof(disjoint_set_e));
@@ -98,10 +74,11 @@ edge* kruskal(graph* g) {
 			dse_union(ds.elements[g->edges[i].node1],
 					ds.elements[g->edges[i].node2]);
 			ret[cpt] = g->edges[i];
-			//cpt; WHYYYYYYYYYYY ????
+			cpt++;
 		}
 	}
-	return ret;
+	printf("%d\n", cpt);
+	return cpt;
 }
 
 //-------------------------------------------------------------------//
@@ -152,7 +129,7 @@ double djikstra(graph* g, size_t dst, size_t start) {
 	return dists[dst].dist;
 }
 
-int main(int argc, char const* argv[])
+/*int main(int argc, char const* argv[])
 {
 	node nodes[6];
 	int xs[6] = {0, 1, 2, 3, 4, 3};
@@ -198,4 +175,4 @@ int main(int argc, char const* argv[])
 	double min_d = djikstra(&g, 4, 0);
 	printf("%lf", min_d);
 	return 0;
-}
+}*/
