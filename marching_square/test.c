@@ -3,11 +3,14 @@
 
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_ttf.h"
+#include <math.h>
 #include <stdio.h>
 
 #define WIDTH 1280
 #define HEIGHT 960
 #define CELLSIZE 32
+
+#define TRESHOLD 81
 
 typedef struct point {
     int x;
@@ -73,6 +76,18 @@ render_data* init_grid(int w, int h, int cell_size) {
     return r_d;
 }
 
+float lerp(float v0, float v1, float t) {
+    return v0 + t * (v1 - v0);
+}
+
+float lerp_t(float o, float t) {
+    return (1 - o)/(t - o);
+}
+
+float get_value(data* d, int x, int y) {
+    return d->values[x + y * d->width];
+}
+
 void render_marching_sq(const render_data* d, SDL_Renderer* renderer) {
     for(size_t x=0; x<d->v_data->width-1; x++) {
         for(size_t y=0; y<d->v_data->height-1; y++) {
@@ -84,66 +99,82 @@ void render_marching_sq(const render_data* d, SDL_Renderer* renderer) {
             float d_x = ((float)x) + 1;
             float d_y = ((float)y) + 1;
 
+            int A_X = d_x      ;     int A_Y = d_y      ;
+            int B_X = (d_x + 1);     int B_Y = d_y      ;
+            int C_X = (d_x + 1);     int C_Y = (d_y + 1);
+            int D_X = d_x      ;     int D_Y = (d_y + 1);
+            float A_V = get_value(d->v_data, x, y)/TRESHOLD;
+            float B_V = get_value(d->v_data, x + 1, y)/TRESHOLD;
+            float C_V = get_value(d->v_data, x + 1, y + 1)/TRESHOLD;
+            float D_V = get_value(d->v_data, x, y + 1)/TRESHOLD;
+            
+            float AB_X = lerp(A_X, B_X, lerp_t(A_V, B_V));
+            float BC_Y = lerp(B_Y, C_Y, lerp_t(B_V, C_V));
+            float AD_Y = lerp(A_Y, D_Y, lerp_t(A_V, D_V));
+            float DC_X = lerp(D_X, C_X, lerp_t(D_V, C_V));
+
             if(NW == 0 && NE == 0 && SW == 0 && SE == 0) {
                 //
             } else if(NW == 0 && NE == 0 && SW == 0 && SE == 1) {
-                SDL_RenderDrawLine( renderer, (d_x+1)*CELLSIZE, (d_y+1/2.)*CELLSIZE,
-                                              (d_x+1/2.)*CELLSIZE, (d_y+1)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, B_X*CELLSIZE, BC_Y*CELLSIZE,
+                                              DC_X*CELLSIZE, D_Y*CELLSIZE);
             } else if(NW == 0 && NE == 0 && SW == 1 && SE == 0) {
-                SDL_RenderDrawLine( renderer, (d_x)*CELLSIZE, (d_y+1/2.)*CELLSIZE,
-                                              (d_x+1/2.)*CELLSIZE, (d_y+1)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, A_X*CELLSIZE, AD_Y*CELLSIZE,
+                                              DC_X*CELLSIZE, D_Y*CELLSIZE);
 
             } else if(NW == 0 && NE == 0 && SW == 1 && SE == 1) {
-                SDL_RenderDrawLine( renderer, (d_x)*CELLSIZE, (d_y+1/2.)*CELLSIZE,
-                                              (d_x+1)*CELLSIZE, (d_y+1/2.)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, A_X*CELLSIZE, AD_Y*CELLSIZE,
+                                              B_X*CELLSIZE, BC_Y*CELLSIZE);
 
             } else if(NW == 0 && NE == 1 && SW == 0 && SE == 0) {
-                SDL_RenderDrawLine( renderer, (d_x+1/2.)*CELLSIZE, (d_y)*CELLSIZE,
-                                              (d_x+1)*CELLSIZE, (d_y+1/2.)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, AB_X*CELLSIZE, A_Y*CELLSIZE,
+                                              B_X*CELLSIZE, BC_Y*CELLSIZE);
 
             } else if(NW == 0 && NE == 1 && SW == 0 && SE == 1) {
-                SDL_RenderDrawLine( renderer, (d_x+1/2.)*CELLSIZE, (d_y)*CELLSIZE,
-                                              (d_x+1/2.)*CELLSIZE, (d_y+1)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, AB_X*CELLSIZE, A_Y*CELLSIZE,
+                                              DC_X*CELLSIZE, D_Y*CELLSIZE);
 
             } else if(NW == 0 && NE == 1 && SW == 1 && SE == 0) {
-                SDL_RenderDrawLine( renderer, (d_x+1/2.)*CELLSIZE, (d_y)*CELLSIZE,
-                                              (d_x)*CELLSIZE, (d_y+1/2.)*CELLSIZE);
-                SDL_RenderDrawLine( renderer, (d_x+1)*CELLSIZE, (d_y+1/2.)*CELLSIZE,
-                                              (d_x+1/2.)*CELLSIZE, (d_y+1)*CELLSIZE);
+                // Point selle à gérer
+                SDL_RenderDrawLine( renderer, AB_X*CELLSIZE, A_Y*CELLSIZE,
+                                              A_X*CELLSIZE, AD_Y*CELLSIZE);
+                SDL_RenderDrawLine( renderer, B_X*CELLSIZE, BC_Y*CELLSIZE,
+                                              DC_X*CELLSIZE, C_Y*CELLSIZE);
 
             } else if(NW == 0 && NE == 1 && SW == 1 && SE == 1) {
-                SDL_RenderDrawLine( renderer, (d_x+1/2.)*CELLSIZE, (d_y)*CELLSIZE,
-                                              (d_x)*CELLSIZE, (d_y+1/2.)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, AB_X*CELLSIZE, A_Y*CELLSIZE,
+                                              A_X*CELLSIZE, AD_Y*CELLSIZE);
 
             } else if(NW == 1 && NE == 0 && SW == 0 && SE == 0) {
-                SDL_RenderDrawLine( renderer, (d_x)*CELLSIZE, (d_y+1/2.)*CELLSIZE,
-                                              (d_x+1/2.)*CELLSIZE, (d_y)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, AB_X*CELLSIZE, A_Y*CELLSIZE,
+                                              A_X*CELLSIZE, AD_Y*CELLSIZE);
 
             } else if(NW == 1 && NE == 0 && SW == 0 && SE == 1) {
-                SDL_RenderDrawLine( renderer, (d_x+1/2.)*CELLSIZE, (d_y)*CELLSIZE,
-                                              (d_x+1)*CELLSIZE, (d_y+1/2.)*CELLSIZE);
-                SDL_RenderDrawLine( renderer, (d_x)*CELLSIZE, (d_y+1/2.)*CELLSIZE,
-                                              (d_x+1/2.)*CELLSIZE, (d_y+1)*CELLSIZE);
+                // Point selle à gérer
+                SDL_RenderDrawLine( renderer, AB_X*CELLSIZE, A_Y*CELLSIZE,
+                                              B_X*CELLSIZE, BC_Y*CELLSIZE);
+                SDL_RenderDrawLine( renderer, A_X*CELLSIZE, AD_Y*CELLSIZE,
+                                              DC_X*CELLSIZE, D_Y*CELLSIZE);
 
             } else if(NW == 1 && NE == 0 && SW == 1 && SE == 0) {
-                SDL_RenderDrawLine( renderer, (d_x+1/2.)*CELLSIZE, (d_y)*CELLSIZE,
-                                              (d_x+1/2.)*CELLSIZE, (d_y+1)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, AB_X*CELLSIZE, A_Y*CELLSIZE,
+                                              DC_X*CELLSIZE, D_Y*CELLSIZE);
 
             } else if(NW == 1 && NE == 0 && SW == 1 && SE == 1) {
-                SDL_RenderDrawLine( renderer, (d_x+1/2.)*CELLSIZE, (d_y)*CELLSIZE,
-                                              (d_x+1)*CELLSIZE, (d_y+1/2.)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, AB_X*CELLSIZE, A_Y*CELLSIZE,
+                                              B_X*CELLSIZE, BC_Y*CELLSIZE);
 
             } else if(NW == 1 && NE == 1 && SW == 0 && SE == 0) {
-                SDL_RenderDrawLine( renderer, (d_x)*CELLSIZE, (d_y+1/2.)*CELLSIZE,
-                                              (d_x+1)*CELLSIZE, (d_y+1/2.)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, A_X*CELLSIZE, AD_Y*CELLSIZE,
+                                              B_X*CELLSIZE, BC_Y*CELLSIZE);
 
             } else if(NW == 1 && NE == 1 && SW == 0 && SE == 1) {
-                SDL_RenderDrawLine( renderer, (d_x)*CELLSIZE, (d_y+1/2.)*CELLSIZE,
-                                              (d_x+1/2.)*CELLSIZE, (d_y+1)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, A_X*CELLSIZE, AD_Y*CELLSIZE,
+                                              DC_X*CELLSIZE, D_Y*CELLSIZE);
 
             } else if(NW == 1 && NE == 1 && SW == 1 && SE == 0) {
-                SDL_RenderDrawLine( renderer, (d_x+1)*CELLSIZE, (d_y+1/2.)*CELLSIZE,
-                                              (d_x+1/2.)*CELLSIZE, (d_y+1)*CELLSIZE);
+                SDL_RenderDrawLine( renderer, B_X*CELLSIZE, BC_Y*CELLSIZE,
+                                              DC_X*CELLSIZE, D_Y*CELLSIZE);
 
             } else if(NW == 1 && NE == 1 && SW == 1 && SE == 1) {
                 //
@@ -237,8 +268,9 @@ int main(int argc, char* argv[]) {
         for(size_t y=0; y<height; y++) {
             size_t x_val = x - width/2;
             size_t y_val = y - height/2;
-            values[x + width*y] = x_val*x_val + y_val*y_val;
-            activation[x + width*y] = values[x + width*y] < 81;
+            values[x + width*y] = (float)(x_val*x_val) - (float)(y_val*y_val);
+            activation[x + width*y] = values[x + width*y] < TRESHOLD;
+            printf("%f, %f, %d\n", x_val*x_val - y_val*y_val, values[x + width * y], activation[x + width * y]);
         }
     }
 
