@@ -10,7 +10,7 @@
 #define HEIGHT 960
 #define CELLSIZE 32
 
-#define TRESHOLD 81
+#define TRESHOLD 40
 
 typedef struct point {
     int x;
@@ -23,6 +23,7 @@ typedef struct line {
 } line;
 
 typedef struct data {
+    int treshold;
     size_t width;
     size_t height;
     float* values;
@@ -77,6 +78,7 @@ render_data* init_grid(int w, int h, int cell_size) {
 }
 
 float lerp(float v0, float v1, float t) {
+    printf("%f\n", v0 + t * (v1 - v0));
     return v0 + t * (v1 - v0);
 }
 
@@ -103,10 +105,15 @@ void render_marching_sq(const render_data* d, SDL_Renderer* renderer) {
             int B_X = (d_x + 1);     int B_Y = d_y      ;
             int C_X = (d_x + 1);     int C_Y = (d_y + 1);
             int D_X = d_x      ;     int D_Y = (d_y + 1);
-            float A_V = get_value(d->v_data, x, y)/TRESHOLD;
-            float B_V = get_value(d->v_data, x + 1, y)/TRESHOLD;
-            float C_V = get_value(d->v_data, x + 1, y + 1)/TRESHOLD;
-            float D_V = get_value(d->v_data, x, y + 1)/TRESHOLD;
+            
+            int treshold = 1;
+            if (d->v_data->treshold != 0)
+                treshold = d->v_data->treshold;
+
+            float A_V = get_value(d->v_data, x, y)/treshold;
+            float B_V = get_value(d->v_data, x + 1, y)/treshold;
+            float C_V = get_value(d->v_data, x + 1, y + 1)/treshold;
+            float D_V = get_value(d->v_data, x, y + 1)/treshold;
             
             float AB_X = lerp(A_X, B_X, lerp_t(A_V, B_V));
             float BC_Y = lerp(B_Y, C_Y, lerp_t(B_V, C_V));
@@ -208,6 +215,10 @@ void render_text(const char* text, TTF_Font* font, SDL_Renderer* renderer, int x
 }
 
 
+typedef struct r_args {
+    const render_data* d;
+    SDL_Renderer* renderer;
+} r_args;
 //***renderer
 
 void render(const render_data* d, SDL_Renderer* renderer) {
@@ -239,8 +250,10 @@ void render(const render_data* d, SDL_Renderer* renderer) {
     render_marching_sq(d, renderer);
 
     TTF_Font* Sans = TTF_OpenFont("Hack-Regular.ttf", 8);
-    const char * error = TTF_GetError();
-    printf("%s \n", error);
+    //if(Sans == NULL) {
+    //    const char * error = TTF_GetError();
+    //    printf("%s \n", error);
+    //}
     for(size_t i=0; i < d->v_data->width * d->v_data->height; i++) {
         int x = i % d->v_data->width; int y = i / d->v_data->width;
         char buffer[20];
@@ -248,11 +261,31 @@ void render(const render_data* d, SDL_Renderer* renderer) {
         render_text(buffer, Sans, renderer, x+1, y+1);
     }
 
+    TTF_CloseFont(Sans);
     SDL_RenderPresent(renderer);
 }
 
-int main(int argc, char* argv[]) {
+Uint32 tick_render(Uint32 delta, void* data) {
+    r_args* dat = (r_args*) data;
+    const render_data* d = dat->d;
+    SDL_Renderer* renderer = dat->renderer;
+    
+    render(d, renderer);
+    return delta;
+}
 
+void compute_data(data* v_data, int width, int height) {
+    for(size_t x=0; x<width; x++) {
+        for(size_t y=0; y<height; y++) {
+            size_t x_val = x - width/2;
+            size_t y_val = y - height/2;
+            v_data->values[x + width*y] = (float)(x_val*x_val) - (float)(y_val*y_val);
+            v_data->activation[x + width*y] = v_data->values[x + width*y] < v_data->treshold;
+        }
+    }
+}
+
+int main(int argc, char* argv[]) {
     int width = (WIDTH - CELLSIZE)/CELLSIZE;
     int height = (HEIGHT - CELLSIZE)/CELLSIZE;
     float values[width*height];
@@ -263,20 +296,13 @@ int main(int argc, char* argv[]) {
     v_data.height = height;
     v_data.values = values;
     v_data.activation = activation;
+    v_data.treshold = TRESHOLD;
 
-    for(size_t x=0; x<width; x++) {
-        for(size_t y=0; y<height; y++) {
-            size_t x_val = x - width/2;
-            size_t y_val = y - height/2;
-            values[x + width*y] = (float)(x_val*x_val) - (float)(y_val*y_val);
-            activation[x + width*y] = values[x + width*y] < TRESHOLD;
-            printf("%f, %f, %d\n", x_val*x_val - y_val*y_val, values[x + width * y], activation[x + width * y]);
-        }
-    }
+    compute_data(&v_data, width, height);
 
     SDL_Window *window;                    // Declare a pointer
 
-    SDL_Init(SDL_INIT_VIDEO);              // Initialize SDL2
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);              // Initialize SDL2
     TTF_Init();
 
     // Create an application window with the following settings:
@@ -308,13 +334,44 @@ int main(int argc, char* argv[]) {
 
     d->v_data = &v_data;
 
-    render(d, renderer);
+    r_args a;
+    a.d = d;
+    a.renderer = renderer;
 
-    char coucou[200];
-    scanf("%s", coucou);
+    SDL_TimerID timer = SDL_AddTimer(30, tick_render, &a);
+
+    SDL_Event event;
+    int cont = 1;
+
+    while (cont) {
+        while (SDL_PollEvent(&event)) {
+            if(event.type == SDL_QUIT) {
+                cont = 0;
+            }
+            if(event.type == SDL_KEYUP) {
+                switch(event.key.keysym.sym) {
+                    case SDLK_z:
+                        d->v_data->treshold++;
+                        //printf("%d\n", treshold);
+                        compute_data(d->v_data, width, height);
+                        break;
+                    case SDLK_s:
+                        d->v_data->treshold--;
+                        //printf("%d\n", treshold);
+                        compute_data(d->v_data, width, height);
+                        break;
+                    default:
+                        cont = 0;
+                        break;
+                }
+            }
+        }
+    }
     
     // Close and destroy the window
     SDL_DestroyWindow(window);
+
+    SDL_RemoveTimer(timer);
 
     // Clean up
     SDL_Quit();
