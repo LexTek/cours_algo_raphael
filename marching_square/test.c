@@ -9,10 +9,10 @@
 
 #define WIDTH 1280
 #define HEIGHT 960
-#define CELLSIZE 32
+#define CELLSIZE 16
 #define NB_CIRCLES 8
 
-#define TRESHOLD 40
+#define TRESHOLD 1
 
 typedef struct vector {
 	float x;
@@ -94,7 +94,6 @@ render_data* init_grid(int w, int h, int cell_size) {
 }
 
 float lerp(float v0, float v1, float t) {
-	printf("%f\n", v0 + t * (v1 - v0));
 	return v0 + t * (v1 - v0);
 }
 
@@ -252,56 +251,76 @@ void render(const render_data* d, SDL_Renderer* renderer) {
 	//    SDL_RenderDrawLine( renderer, l->p1.x, l->p1.y, l->p2.x, l->p2.y);
 	//}
 
-	for(size_t i=0; i < d->nb_c_x * d->nb_c_y; i++) {
-		// Render rect
-		if(d->v_data->activation[i] == 1) {
-			SDL_SetRenderDrawColor( renderer, 128, 255, 128, 255 );
-		} else {
-			SDL_SetRenderDrawColor( renderer, 128, 128, 128, 255 );
-		}
-		SDL_RenderFillRect( renderer, d->cells + i );
-	}
+//	for(size_t i=0; i < d->nb_c_x * d->nb_c_y; i++) {
+//		// Render rect
+//		if(d->v_data->activation[i] == 1) {
+//			SDL_SetRenderDrawColor( renderer, 128, 255, 128, 255 );
+//		} else {
+//			SDL_SetRenderDrawColor( renderer, 128, 128, 128, 255 );
+//		}
+//		SDL_RenderFillRect( renderer, d->cells + i );
+//	}
 
 	SDL_SetRenderDrawColor( renderer, 128, 255, 128, 255 );
 	render_marching_sq(d, renderer);
 
-	TTF_Font* Sans = TTF_OpenFont("Hack-Regular.ttf", 8);
+//	TTF_Font* Sans = TTF_OpenFont("Hack-Regular.ttf", 8);
 	//if(Sans == NULL) {
 	//    const char * error = TTF_GetError();
 	//    printf("%s \n", error);
 	//}
-	for(size_t i=0; i < d->v_data->width * d->v_data->height; i++) {
-		int x = i % d->v_data->width; int y = i / d->v_data->width;
-		char buffer[20];
-		snprintf(buffer, 20, "%d", (int)d->v_data->values[i]);
-		render_text(buffer, Sans, renderer, x+1, y+1);
-	}
+//	for(size_t i=0; i < d->v_data->width * d->v_data->height; i++) {
+//		int x = i % d->v_data->width; int y = i / d->v_data->width;
+//		char buffer[20];
+//		snprintf(buffer, 20, "%d", (int)d->v_data->values[i]);
+//		render_text(buffer, Sans, renderer, x+1, y+1);
+//	}
 
-	TTF_CloseFont(Sans);
+//	TTF_CloseFont(Sans);
 
-	SDL_SetRenderDrawColor( renderer, 128, 255, 128, 255 );
-	for(size_t i=0; i < d->v_data->nb_circles; i++) {
-		circle* c = d->v_data->circles + i;
-		SDL_RenderDrawLine( renderer, c->center.x-c->radius, c->center.y-c->radius, c->center.x-c->radius, c->center.y+c->radius);
-		SDL_RenderDrawLine( renderer, c->center.x-c->radius, c->center.y+c->radius, c->center.x+c->radius, c->center.y+c->radius);
-		SDL_RenderDrawLine( renderer, c->center.x+c->radius, c->center.y+c->radius, c->center.x+c->radius, c->center.y-c->radius);
-		SDL_RenderDrawLine( renderer, c->center.x+c->radius, c->center.y-c->radius, c->center.x-c->radius, c->center.y-c->radius);
-	}
+	//SDL_SetRenderDrawColor( renderer, 128, 255, 128, 255 );
+	//for(size_t i=0; i < d->v_data->nb_circles; i++) {
+	//	circle* c = d->v_data->circles + i;
+	//	SDL_RenderDrawLine( renderer, c->center.x-c->radius, c->center.y-c->radius, c->center.x-c->radius, c->center.y+c->radius);
+	//	SDL_RenderDrawLine( renderer, c->center.x-c->radius, c->center.y+c->radius, c->center.x+c->radius, c->center.y+c->radius);
+	//	SDL_RenderDrawLine( renderer, c->center.x+c->radius, c->center.y+c->radius, c->center.x+c->radius, c->center.y-c->radius);
+	//	SDL_RenderDrawLine( renderer, c->center.x+c->radius, c->center.y-c->radius, c->center.x-c->radius, c->center.y-c->radius);
+	//}
 
 	SDL_RenderPresent(renderer);
+}
+
+void compute_data(data* v_data) {
+	for(size_t x=0; x<v_data->width; x++) {
+		for(size_t y=0; y<v_data->height; y++) {
+			//size_t x_val = x - width/2;
+			//size_t y_val = y - height/2;
+			//v_data->values[x + width*y] = (float)(x_val*x_val) - (float)(y_val*y_val);
+            float somme = 0;
+            for(size_t i=0; i<v_data->nb_circles; i++) {
+		        circle* c = v_data->circles + i;
+                float v = (float) ((c->radius / CELLSIZE) * (c->radius / CELLSIZE))/((x - c->center.x / CELLSIZE)*(x - c->center.x / CELLSIZE) + (y - c->center.y / CELLSIZE)*(y - c->center.y / CELLSIZE));
+                somme += v;
+            }
+			v_data->values[x + v_data->width*y] = somme;
+			//v_data->activation[x + width*y] = v_data->values[x + width*y] < v_data->treshold;
+			v_data->activation[x + v_data->width*y] = v_data->values[x + v_data->width*y] > 1;
+		}
+	}
 }
 
 Uint32 tick_update(Uint32 interval, void* d) {
 	data* dat = (data*) d;
 	for(size_t i=0; i<dat->nb_circles; i++) {
 		circle* c = dat->circles + i;
-		if(c->center.x <= c->radius || c->center.x >= WIDTH - c->radius)
+		if(c->center.x <= c->radius || c->center.x >= WIDTH - c->radius - 2*CELLSIZE)
 			c->direction.x *= -1;
-		if(c->center.y <= c->radius || c->center.y >= HEIGHT - c->radius)
+		if(c->center.y <= c->radius || c->center.y >= HEIGHT - c->radius - 2*CELLSIZE)
 			c->direction.y *= -1;
 		c->center.x += c->direction.x*c->speed * interval;
 		c->center.y += c->direction.y*c->speed * interval;
 	}
+	compute_data(dat);
 	return interval;
 }
 
@@ -312,17 +331,6 @@ Uint32 tick_render(Uint32 interval, void* data) {
 
 	render(d, renderer);
 	return interval;
-}
-
-void compute_data(data* v_data, int width, int height) {
-	for(size_t x=0; x<width; x++) {
-		for(size_t y=0; y<height; y++) {
-			size_t x_val = x - width/2;
-			size_t y_val = y - height/2;
-			v_data->values[x + width*y] = (float)(x_val*x_val) - (float)(y_val*y_val);
-			v_data->activation[x + width*y] = v_data->values[x + width*y] < v_data->treshold;
-		}
-	}
 }
 
 int main(int argc, char* argv[]) {
@@ -336,11 +344,11 @@ int main(int argc, char* argv[]) {
 	for(size_t i=0; i<NB_CIRCLES; i++) {
 		circles[i].center.x = WIDTH/2;
 		circles[i].center.y = HEIGHT/2;
-		circles[i].radius = 1*CELLSIZE + (rand() % (3*CELLSIZE));
+		circles[i].radius = (1*CELLSIZE + (rand() % (3*CELLSIZE)) )* WIDTH/(50*CELLSIZE);
 		float x = 50-rand()%100; float y = 50-rand()%100;
 		circles[i].direction.x = x / (sqrtf(x*x + y*y));
 		circles[i].direction.y = y / (sqrtf(x*x + y*y));
-		circles[i].speed = 0.3f;
+		circles[i].speed = 0.1f* WIDTH/(50*CELLSIZE);
 	}
 
 	data v_data;
@@ -352,7 +360,7 @@ int main(int argc, char* argv[]) {
 	v_data.circles = circles;
 	v_data.nb_circles = NB_CIRCLES;
 
-	compute_data(&v_data, width, height);
+	compute_data(&v_data);
 
 	SDL_Window *window;                    // Declare a pointer
 
@@ -409,12 +417,10 @@ int main(int argc, char* argv[]) {
 					case SDLK_z:
 						d->v_data->treshold++;
 						//printf("%d\n", treshold);
-						compute_data(d->v_data, width, height);
 						break;
 					case SDLK_s:
 						d->v_data->treshold--;
 						//printf("%d\n", treshold);
-						compute_data(d->v_data, width, height);
 						break;
 					default:
 						cont = 0;

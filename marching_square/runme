@@ -1,2 +1,1 @@
-gcc test.c -lSDL2
--I/usr/include/SDL2 -D_REENTRANT -lSDL2_ttf -lGL -Wall && ./a.out
+gcc test.c `sdl2-config --libs --cflags` -lSDL2_ttf -lGL -Wall -lm && ./a.out
