@@ -4,5 +4,7 @@ block content
   h1= title
   p Welcome to #{title}
   canvas#game(width='300', height='300')
+  script.
+    var index = #{index}
   script(src="/socket.io/socket.io.js")
   script(src="/javascripts/game.js")

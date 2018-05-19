@@ -4,13 +4,15 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
-var gameRouter = require('./routes/game');
-
 var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
+
+let games = {};
+
+var indexRouter = require('./routes/index');
+var usersRouter = require('./routes/users');
+var gameRouter = require('./routes/game')(io, games);
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -28,34 +30,22 @@ app.use('/game', gameRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
-  next(createError(404));
+    next(createError(404));
 });
 
 // error handler
 app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
+    // set locals, only providing error in development
+    res.locals.message = err.message;
+    res.locals.error = req.app.get('env') === 'development' ? err : {};
 
-  // render the error page
-  res.status(err.status || 500);
-  res.render('error');
-});
-
-let x = 10;
-let y = 10;
-io.on('connection', function(socket){
-  console.log('a user connected');
-  io.emit('pos_changed', {'x' : x, 'y' : y});
-  socket.on('move', function(mv) {
-    x += mv.x;
-    y += mv.y;
-    io.emit('pos_changed', {'x' : x, 'y' : y});
-  });
+    // render the error page
+    res.status(err.status || 500);
+    res.render('error');
 });
 
 http.listen(3000, function(){
-  console.log('listening on *:3000');
+    console.log('listening on *:3000');
 });
 
 //module.exports = app;
