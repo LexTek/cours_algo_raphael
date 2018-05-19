@@ -2,11 +2,13 @@ extends layout
 
 block content
   p Welcome to lobby
-  ul
-  each i in games
-    li
-      a(href='game/'+i) Game #{i}
+  div#gamesu
+    each i in games
+      li
+        a(href='game/'+i) Game #{i}
 
   form(name="Create game", method="post")
     div.actions
       input(type="submit", value="add")
+  script(src="/socket.io/socket.io.js")
+  script(src="/javascripts/lobby.js")

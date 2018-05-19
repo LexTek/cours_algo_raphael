@@ -3,7 +3,7 @@ let rq = {};
 rq['1'] = {'x': 25, 'y': 150, 'w': 10, 'h': 40};
 rq['2'] = {'x': 275, 'y': 150, 'w': 10, 'h': 40};
 let sc = {'1': 0, '2': 0};
-var socket = io();
+var socket = io('/game');
 
 console.log('join_game', index);
 socket.emit('join_game', index);
@@ -30,18 +30,46 @@ socket.on('kick', function(msg) {
     window.location.href = '/game';
 });
 
+let up = false;
+let down = false;
+
 document.addEventListener('keydown', function(event) {
-    let mvy = 0;
     if(event.keyCode == 38) {
-        mvy = -10
         console.log('up')
+        up = true
+        socket.emit('state', {'up': up, 'down': down});
     }
     else if(event.keyCode == 40) {
-        mvy = 10
         console.log('down')
+        down = true
+        socket.emit('state', {'up': up, 'down': down});
     }
-    socket.emit('move', {'y' : mvy});
 });
+
+document.addEventListener('keyup', function(event) {
+    if(event.keyCode == 38) {
+        console.log('up')
+        up = false
+        socket.emit('state', {'up': up, 'down': down});
+    }
+    else if(event.keyCode == 40) {
+        console.log('down')
+        down = false
+        socket.emit('state', {'up': up, 'down': down});
+    }
+});
+
+window.setInterval(function() {
+    if(up || down) {
+        let mvy = 0;
+        if(up) {
+            mvy -= 5;
+        } else {
+            mvy += 5;
+        }
+        socket.emit('move', {'y' : mvy});
+    }
+}, 20);
 
 var game_canvas = document.getElementById("game")
 var width = game_canvas.getAttribute('width');

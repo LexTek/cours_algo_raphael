@@ -8,13 +8,20 @@ let ball_collides_rq = (ball, rq) => {
 
 module.exports = function(io, games) {
 
-    io.on('connection', function(socket) {
-        console.log("connected");
+    var nsp_l = io.of('/lobby');
+    nsp_l.on('connection', function(socket) {
+        console.log("connected lobby");
+    });
+
+    var nsp_g = io.of('/game');
+    nsp_g.on('connection', function(socket) {
+        console.log("connected game");
 
         let socket_id = socket.id;
         let index;
         let ball;
         let rq;
+        let st;
         let id;
 
         socket.on('join_game', function(index_g) {
@@ -27,6 +34,7 @@ module.exports = function(io, games) {
                     games[index]['player1'] = socket.id;
                     ball = games[index]['ball'];
                     rq = games[index]['rq1'];
+                    st = games[index]['state1'];
                     id = '1';
                     socket.join(index);
                     console.log('joined :', index);
@@ -36,32 +44,91 @@ module.exports = function(io, games) {
                     games[index]['player2'] = socket.id;
                     ball = games[index]['ball'];
                     rq = games[index]['rq2'];
+                    st = games[index]['state2'];
                     id = '2';
                     socket.join(index);
                     console.log('joined :', index);
                     games[index]['started'] = true;
+
+                    //send update game list
+                    let act_games = [];
+                    for(let v of Object.keys(games)) {
+                        if(!games[v].started)
+                            act_games.push(v);
+                    }
+                    nsp_l.emit('list_changed', act_games);
+
                     games[index]['interval'] = setInterval(function() {
                         let dx = ball['v'] * Math.cos(ball['a']) * 60./1000;
                         let dy = ball['v'] * Math.sin(ball['a']) * 60./1000;
+                        //console.log('dx', dx, 'dy', dy, games[index]['state1'], games[index]['state2']);
                         ball['x'] += dx;
                         ball['y'] += dy;
                         if(ball['x'] - ball['w']/2 < 0) {
                             ball['a'] = Math.PI - ball['a'];
+                            if(ball['a'] > Math.PI) {
+                                ball['a'] -= 2*Math.PI;
+                            }
+                            if(ball['a'] < -Math.PI) {
+                                ball['a'] += 2*Math.PI;
+                            }
                             games[index]['sc2']++;
-                            io.to(index).emit('score_changed', {'sc1' : games[index]['sc1'], 'sc2' : games[index]['sc2']});
+                            nsp_g.to(index).emit('score_changed', {'sc1' : games[index]['sc1'], 'sc2' : games[index]['sc2']});
                         }
                         if(ball['x'] + ball['w']/2 > 300) {
                             ball['a'] = Math.PI - ball['a'];
+                            if(ball['a'] > Math.PI) {
+                                ball['a'] -= 2*Math.PI;
+                            }
+                            if(ball['a'] < -Math.PI) {
+                                ball['a'] += 2*Math.PI;
+                            }
                             games[index]['sc1']++;
-                            io.to(index).emit('score_changed', {'sc1' : games[index]['sc1'], 'sc2' : games[index]['sc2']});
+                            nsp_g.to(index).emit('score_changed', {'sc1' : games[index]['sc1'], 'sc2' : games[index]['sc2']});
                         }
                         if(ball['y'] - ball['h']/2 < 0 || ball['y'] + ball['h']/2 > 300) {
                             ball['a'] = - ball['a'];
                         }
+                        //console.log(ball['a']/Math.PI);
                         if(ball_collides_rq(ball, games[index]['rq1']) || ball_collides_rq(ball, games[index]['rq2'])) {
-                            ball['a'] = Math.PI - ball['a'];
+                            let p_collide = '';
+                            if(ball_collides_rq(ball, games[index]['rq1']))
+                                p_collide = 'state1';
+                            else
+                                p_collide = 'state2';
+                            ball['a'] = (Math.PI - ball['a']);//%2*Math.PI;
+                            if(ball['a'] > Math.PI) {
+                                ball['a'] -= 2*Math.PI;
+                            }
+                            if(ball['a'] < -Math.PI) {
+                                ball['a'] += 2*Math.PI;
+                            }
+                            if(dy > 0) {//balle descends
+                                if(games[index][p_collide]['down']) {
+                                    ball['a'] = (4*ball['a'] + Math.PI/2)/5;
+                                } else if(games[index][p_collide]['up']) {
+                                    if(-dx < 0) {
+                                        ball['a'] = (2*ball['a'] + Math.PI)/3;
+                                    } else {
+                                        ball['a'] = (2*ball['a'] + 0)/3;
+                                    }
+                                }
+                            } else { //balle monte
+                                if(ball['a'] <= 0) {
+                                    console.log("monte : ", ball['a']/Math.PI);
+                                }
+                                if(games[index][p_collide]['up']) {
+                                    ball['a'] = (4*ball['a'] - Math.PI/2)/5;
+                                } else if(games[index][p_collide]['down']) {
+                                    if(-dx < 0) {
+                                        ball['a'] = (2*ball['a'] - Math.PI)/3;
+                                    } else {
+                                        ball['a'] = (2*ball['a'] - 0)/3;
+                                    }
+                                }
+                            }
                         }
-                        io.to(index).emit('pos_changed', {'x' : ball['x'], 'y' : ball['y']});
+                        nsp_g.to(index).emit('pos_changed', {'x' : ball['x'], 'y' : ball['y']});
                     }, 60);
                 } else {
                     socket.emit('kick', 'No place in this game');
@@ -76,7 +143,14 @@ module.exports = function(io, games) {
             if(index != undefined) {
                 rq['y'] += mv.y;
                 //console.log(rq)
-                io.to(index).emit('pos_changed_rq', {'id' : id, 'y' : rq['y']});
+                nsp_g.to(index).emit('pos_changed_rq', {'id' : id, 'y' : rq['y']});
+            }
+        });
+
+        socket.on('state', function(state) {
+            if(index != undefined) {
+                st['up'] = state['up'];
+                st['down'] = state['down'];
             }
         });
 
@@ -84,15 +158,22 @@ module.exports = function(io, games) {
             console.log("disconnected", games[index], socket_id);
             if(index != undefined && games[index] != undefined && (games[index]['player1'] == socket_id || games[index]['player2'] == socket_id)) {
                 console.log("clearing room", index);
-                io.to(index).emit('kick', 'A player leaved the game');
-                io.of('/').in(index).clients((error, socketIds) => {
+                nsp_g.to(index).emit('kick', 'A player leaved the game');
+                nsp_g.in(index).clients((error, socketIds) => {
                     if (error) throw error;
-                    socketIds.forEach(socketId => io.sockets.sockets[socketId].leave(index));
+                    socketIds.forEach(socketId => nsp_g.sockets[socketId].leave(index));
                 });
 
                 clearInterval(games[index]['interval']);
                 delete games[index];
                 index = undefined;
+                //send update game list
+                let act_games = [];
+                for(let v of Object.keys(games)) {
+                    if(!games[v].started)
+                        act_games.push(v);
+                }
+                nsp_l.emit('list_changed', act_games);
             }
         });
     });
@@ -118,9 +199,12 @@ module.exports = function(io, games) {
             'player1' : undefined,
             'sc1'     : 0,
             'rq1'     : {'x': 25, 'y': 150, 'w': 10, 'h': 40},
+            'state1'  : {'up': false, 'down': false},
             'player2' : undefined,
             'sc2'     : 0,
             'rq2'     : {'x': 275, 'y': 150, 'w': 10, 'h': 40},
+            'state2'  : {'up': false, 'down': false},
+            'player2' : undefined,
             'interval': undefined,
             'started' : false};
 
@@ -130,6 +214,7 @@ module.exports = function(io, games) {
                 act_games.push(v);
         }
         res.render('lobby', { games: act_games });
+        nsp_l.emit('list_changed', act_games);
     });
 
     router.get('/:id', function(req, res, next) {
